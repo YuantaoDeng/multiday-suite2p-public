@@ -1,13 +1,16 @@
-import numpy as np
-import os
 import glob
 import json
-from ScanImageTiffReader import ScanImageTiffReader
-import yaml
-from suite2p.run_s2p import default_ops
+import os
+
+import numpy as np
 import pirt
-from skimage.measure import regionprops, find_contours
 import scipy.ndimage
+import yaml
+
+from ScanImageTiffReader import ScanImageTiffReader
+from skimage.measure import find_contours, regionprops
+from suite2p.run_s2p import default_ops
+
 
 def create_mask_img(masks,im_size,field=None,mark_overlap=False,contours=False,contour_upsampling = 1):
     """Function for creating (label) images from cells masks info.

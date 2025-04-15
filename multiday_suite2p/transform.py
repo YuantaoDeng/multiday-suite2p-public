@@ -1,9 +1,12 @@
 import numpy as np
-from scipy.spatial.distance import pdist,squareform
 import pirt
 import scipy.cluster.hierarchy
+
+from scipy.spatial.distance import pdist,squareform
 from tqdm import tqdm
-from multiday_suite2p.utils import deform_masks, create_mask_img, add_overlap_info
+
+from .utils import deform_masks, create_mask_img, add_overlap_info
+
 
 def transform_points(xpix,ypix, deform):
     """Transform points (in pixel space) according to DeformationField object

@@ -1,7 +1,9 @@
 from getpass import getpass
-from ipyfilechooser import FileChooser
-import yaml
 from pathlib import Path
+
+import yaml
+from ipyfilechooser import FileChooser
+
 
 def select_settings_file(start_dir='../'):
     fc = FileChooser(start_dir)

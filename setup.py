@@ -1,9 +1,10 @@
 from setuptools import setup
+
 setup(
     name = 'multiday-suite2p',
     version = '0.0.1',
     description = 'Tools for registering suit2p data from multidays',
-    url = 'https://github.com/winnubstj/multiday-suite2p',
+    url = 'https://github.com/Sun-Lab-NBB/multiday-suite2p-public',
     author = 'Johan Winnubst',
     author_email = 'winnubstj@janelia.hhmi.org',
     packages = ['multiday_suite2p'],

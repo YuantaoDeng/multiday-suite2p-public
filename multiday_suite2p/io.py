@@ -1,14 +1,14 @@
-import sys
-import yaml
-import shutil
 import os
 import re
-import json
+import yaml
+
 import numpy as np
-from multiday_suite2p.utils import create_mask_img, add_overlap_info
-from pathlib import Path
-from tqdm import tqdm,trange
 import pandas as pd
+
+from pathlib import Path
+
+from .utils import create_mask_img, add_overlap_info
+
 
 def find_session_folders(main_folder,days,verbose=False, suite2p_folder_name = "suite2p"):
     """Find folders with suite2p subdirectories in main folder

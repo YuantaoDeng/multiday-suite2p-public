@@ -1,13 +1,14 @@
-from .io  import test_extract_result_present
-import uuid 
 import re
+import uuid
 
 from IPython import get_ipython
 from pathlib import Path
 from suite2p.io.server import ssh_connect
 
+from .io  import test_extract_result_present
 
-def extract_job(data_info, settings,data_path, force_recalc=False, bsubargs='', extract_job_path='~/.multiday-suite2p/extract_session_job.sh'):
+
+def extract_job(data_info, settings, data_path, force_recalc=False, bsubargs='', extract_job_path='~/.multiday-suite2p/extract_session_job.sh'):
     if (not test_extract_result_present(Path(data_info['data']['local_processed_root'])/data_info['data']['output_folder']/'sessions'/data_path)) | force_recalc:
         multiday_linux = (Path(data_info['data']['server_processed_root'])/data_info['data']['output_folder']).as_posix()
         data_folder = data_info['data']['server_processed_root']

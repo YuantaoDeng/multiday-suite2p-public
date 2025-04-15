@@ -1,19 +1,22 @@
 import os
-import numpy as np
+
 from pathlib import Path
+
+import numpy as np
+
 from suite2p.io import compute_dydx, BinaryFileCombined
 from suite2p.extraction.masks import create_masks
 from suite2p.extraction.extract import extract_traces
 
 
-def extract_traces_session(multiday_folder,data_folder,bin_folder,data_path):
+def extract_traces_session(multiday_folder, data_folder, bin_folder, data_path):
     """Main extraction function. Collects traces based on registered masks for one session (for parallelization)
 
     Args:
-        multiday_folder (string): [description]
+        multiday_folder (string): 
         data_folder ([type]): [description]
         bin_folder ([type]): [description]
-        session_ind ([type]): [description]
+        data_path ([type]): [description]
     """
     # convert to path
     multiday_folder = Path(multiday_folder)
@@ -70,7 +73,7 @@ def extract_traces_session(multiday_folder,data_folder,bin_folder,data_path):
     print('\nExtracting traces')
     with BinaryFileCombined(LY, LX, Ly, Lx, dy, dx, reg_loc) as f:    
         F, Fneu = extract_traces(f, cell_masks, neuropil_masks, ops_combined["batch_size"])
-    
+
     # save files.
     print(f"\nSaving results in {save_folder}..")
     np.save(save_folder/'ops.npy', ops_combined)

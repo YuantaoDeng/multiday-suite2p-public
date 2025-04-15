@@ -1,5 +1,7 @@
 import numpy as np
+
 from suite2p.extraction import preprocess
+
 
 def demix_traces(F, Fneu, cell_masks, ops):
     """Demix activity from overlaping cells

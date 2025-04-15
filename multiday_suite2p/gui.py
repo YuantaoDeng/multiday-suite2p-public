@@ -1,9 +1,10 @@
-import matplotlib.pyplot as plt
-from ipywidgets import HBox,VBox
 import ipywidgets as widgets
-from random import random
 import numpy as np
+import matplotlib.pyplot as plt
+
 from IPython.display import display
+from ipywidgets import HBox, VBox
+
 
 def show_imgs_with_masks(sessions,images,mask_sets, aspect_ratio=1.5):
     """GUI for looking at session images and overlay different sets of cell masks.
