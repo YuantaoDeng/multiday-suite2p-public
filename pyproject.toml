@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multiday-suite2p"
+version = "0.0.1"
+description = "Tools for registering suite2p data from multidays"
+authors = [
+    { name="Johan Winnubst", email="winnubstj@janelia.hhmi.org" }
+]
+dependencies = [
+    "click",
+    "jupyter",
+    "imageio",
+    "pyyaml",
+    "scanimage-tiff-reader",
+    "suite2p",
+    "scikit-image",
+    "ipyfilechooser",
+    "tqdm",
+    "napari",
+    "pirt @ git+https://github.com/kushaangupta/pirt"
+]
+
+[project.scripts]
+multiday-suite2p = "multiday_suite2p.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["multiday_suite2p*"]
