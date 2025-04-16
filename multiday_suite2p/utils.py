@@ -2,6 +2,8 @@ import glob
 import json
 import os
 
+from typing import List, Dict, Any, Tuple, Optional, Union
+
 import numpy as np
 import pirt
 import scipy.ndimage
@@ -12,241 +14,303 @@ from skimage.measure import find_contours, regionprops
 from suite2p.run_s2p import default_ops
 
 
-def create_mask_img(masks,im_size,field=None,mark_overlap=False,contours=False,contour_upsampling = 1):
-    """Function for creating (label) images from cells masks info.
+def create_mask_img(
+    masks: List[Dict[str, np.ndarray]],
+    im_size: List[int],
+    field: Optional[str] = None,
+    mark_overlap: bool = False,
+    contours: bool = False,
+    contour_upsampling: int = 1
+) -> np.ndarray:
+    """Create label images from cell masks with optional overlap marking and contour generation.
 
     Args:
-        masks (list of dicitonaries): Dictionaries must contain 'xpix' 'ypix'
-        im_size (list): size of image to create.
-        field ([string], optional): Instead of mask id use this field. Defaults to None.
-        mark_overlap (bool, optional): show overlaping regions as fixed value (100). Defaults to False. Ignored if contours is True.
-        contours (bool,optional): show contours of masks (disables mark_overlap)
-        contour_upsampling (int,optional): upscale contours image by this factor (helpful for generating pretty overlay images)
+        masks (List[Dict[str, np.ndarray]]): List of mask dictionaries containing 'xpix' and 'ypix' keys.
+        im_size (List[int]): [height, width] of output image.
+        field (Optional[str], optional): Mask field to use for pixel values (None for mask IDs).
+        mark_overlap (bool, optional): Highlight overlapping regions with value 100.
+        contours (bool, optional): Generate mask contours instead of filled regions.
+        contour_upsampling (int, optional): Scaling factor for contour resolution.
 
     Returns:
-        [numpy array]: resulting image.
+        Label image with mask representations
+
+    Raises:
+        ValueError: If both mark_overlap and contours are enabled
     """
-    # create holder image.
-    if (not field) or  (field=="id"):
-        im = np.zeros([im_size[0]*contour_upsampling,im_size[1]*contour_upsampling],np.uint32)
+    if mark_overlap and contours:
+        raise ValueError("Cannot combine mark_overlap with contour generation")
+
+    # Initialize output image with appropriate dtype
+    if (not field) or (field == "id"):
+        im = np.zeros(
+            (im_size[0] * contour_upsampling, im_size[1] * contour_upsampling),
+            dtype=np.uint32,
+        )
     else:
-        im = np.zeros([im_size[0],im_size[1]], np.float64)
-    for id, mask in enumerate(masks):
-        # get value to fill in
-        if field:
-            value = mask[field]
-        else:
-            value = id
-        # Fill out value
+        im = np.zeros(im_size, dtype=np.float64)
+
+    for mask_id, mask in enumerate(masks):
+        value = mask[field] if field else mask_id
+        ypix, xpix = mask["ypix"], mask["xpix"]
+
         if not contours:
-            im[mask["ypix"],mask["xpix"]] = value
-            # mark overlap as fixed value.
+            im[ypix, xpix] = value
             if mark_overlap:
-                im[mask["ypix"][mask['overlap']],mask["xpix"][mask['overlap']]] = 100
-        #contours
+                im[ypix[mask['overlap']], xpix[mask['overlap']]] = 100
         else:
-            # create small image with this mask
-            origin = [min(mask['ypix']-1),min(mask['xpix']-1)]
-            ypix, xpix = mask['ypix']-origin[0], mask['xpix']-origin[1]
-            temp_img = np.zeros([max(ypix)+2,max(xpix)+2],bool)
-            temp_img[ypix,xpix]=True
+            origin = [min(ypix-1), min(xpix-1)]
+            y_local = ypix - origin[0]
+            x_local = xpix - origin[1]
+
+            temp_img = np.zeros((max(y_local)+2, max(x_local)+2), dtype=bool)
+            temp_img[y_local, x_local] = True
             temp_img = scipy.ndimage.zoom(temp_img, contour_upsampling, order=0)
-            # find contours.
+
             contours_ind = np.vstack(find_contours(temp_img)).astype(int)
-            im[contours_ind[:,0]+(origin[0]*contour_upsampling),contours_ind[:,1]+(origin[1]*contour_upsampling)] = value
+            im[
+                contours_ind[:,0] + (origin[0]*contour_upsampling),
+                contours_ind[:,1] + (origin[1]*contour_upsampling)
+            ] = value
+
     return im
 
-def tif_metadata(image_path):
+def tif_metadata(image_path: str) -> Dict[str, Any]:
+    """Extract and parse metadata from ScanImage TIFF files.
+
+    Args:
+        image_path (str): Path to TIFF file.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing parsed metadata with nested structure.
+    """
     image = ScanImageTiffReader(image_path)
     metadata_raw = image.metadata()
-    metadata_str = metadata_raw.split('\n\n')[0]
-    metadata_json = metadata_raw.split('\n\n')[1]
-    metadata_dict = dict(item.split('=') for item in metadata_str.split('\n') if 'SI.' in item)
-    metadata = {k.strip().replace('SI.','') : v.strip() for k, v in metadata_dict.items()}
-    for k in list(metadata.keys()):
-        if '.' in k:
-            ks = k.split('.')
-            # TODO just recursively create dict from .-containing values
-            if k.count('.') == 1:
-                if not ks[0] in metadata.keys():
-                    metadata[ks[0]] = {}
-                metadata[ks[0]][ks[1]] = metadata[k]
-            elif k.count('.') == 2:
-                if not ks[0] in metadata.keys():
-                    metadata[ks[0]] = {}
-                    metadata[ks[0]][ks[1]] = {}
-                elif not ks[1] in metadata[ks[0]].keys():
-                    metadata[ks[0]][ks[1]] = {}
-                metadata[ks[0]][ks[1]] = metadata[k]
-            elif k.count('.') > 2:
-                print('skipped metadata key ' + k + ' to minimize recursion in dict')
-            metadata.pop(k)
-    metadata['json'] = json.loads(metadata_json)
-    metadata['image_shape'] = image.shape()
-    return metadata
 
-def metadata_to_ops(metadata):
-    data = {}
-    #frame rate.
-    data['fs'] = float(metadata['hRoiManager']['scanVolumeRate'])
-    #number of planes.
-    z_collection = metadata['hFastZ']['userZs']
-    if isinstance(z_collection,str):
-        data['nplanes'] = 1
-    else:
-        data['nplanes'] = len(z_collection)
-    #number of rois.
-    roi_metadata = metadata['json']['RoiGroups']['imagingRoiGroup']['rois']
-    data['nrois'] = len(roi_metadata)
-    #channels (NOT SURE IF THIS CORRECT BECAUSE I DONT HAVE A SESSION WITH MORE THAN ONE CHANNEL...)
-    data['nchannels'] = int(metadata['hChannels']['channelsActive']) #or channelSave?
-    #roi info.
-    roi = {}
-    w_px = []
-    h_px = []
-    cXY = []
-    szXY = []
-    for r in range(data['nrois']):
-        roi[r] = {}
-        roi[r]['w_px'] = roi_metadata[r]['scanfields']['pixelResolutionXY'][0]
-        w_px.append(roi[r]['w_px'])
-        roi[r]['h_px'] = roi_metadata[r]['scanfields']['pixelResolutionXY'][1]
-        h_px.append(roi[r]['h_px'])
-        roi[r]['center'] = roi_metadata[r]['scanfields']['centerXY']
-        cXY.append(roi[r]['center'])
-        roi[r]['size'] = roi_metadata[r]['scanfields']['sizeXY']
-        szXY.append(roi[r]['size'])
-    w_px = np.asarray(w_px)
-    h_px = np.asarray(h_px)
-    szXY = np.asarray(szXY)
-    cXY = np.asarray(cXY)
-    cXY = cXY - szXY / 2
-    cXY = cXY - np.amin(cXY, axis=0)
-    mu = np.median(np.transpose(np.asarray([w_px, h_px])) / szXY, axis=0)
-    imin = cXY * mu
-    imin = np.ceil(imin)
-    #
-    n_rows_sum = np.sum(h_px)
-    n_flyback = (metadata['image_shape'][1] - n_rows_sum) / np.max([1, data['nrois'] - 1])
-    irow = np.insert(np.cumsum(np.transpose(h_px) + n_flyback), 0, 0)
-    irow = np.delete(irow, -1)
-    irow = np.vstack((irow, irow + np.transpose(h_px)))
-    #lines.
-    data['dx'] = []
-    data['dy'] = []
-    data['lines'] = []
-    for i in range(data['nrois']):
-        data['dy'] = np.hstack((data['dy'], imin[i,1]))
-        data['dx'] = np.hstack((data['dx'], imin[i,0]))
-        data['lines'].append(np.array(range(irow[0,i].astype('int32'), irow[1,i].astype('int32'))))
-    data['lines'] = np.array(data['lines'])
-    data['dx'] = data['dx'].astype('int32')
-    data['dy'] = data['dy'].astype('int32')
-    return data
+    # Split metadata sections
+    metadata_str, metadata_json = metadata_raw.split('\n\n', 1)
 
-def yaml_to_dict(file_path):
-    with open(file_path) as file:
-        data = yaml.load(file, Loader=yaml.FullLoader)
-    return data
+    # Parse key-value pairs
+    metadata_dict = {}
+    for item in metadata_str.split('\n'):
+        if 'SI.' in item:
+            key, val = item.split('=', 1)
+            clean_key = key.strip().replace('SI.', '')
+            metadata_dict[clean_key] = val.strip()
 
-def multiday_ops(exp,session,folder_name,settings):
-    print(session)
-    data_path = os.path.join(exp['data']['folder_linux'],session['date'],str(session['sub_dir']))
-    # read meta data from tiff.
-    tif_path = glob.glob(os.path.join(data_path,f"*{session['date']}_{session['sub_dir']}_*.tif"))
-    if len(tif_path)==0:
-        raise NameError(f"Could not find tif in {data_path}")
-    ops = metadata_to_ops(tif_metadata(tif_path[0]))
-    # path locations.
-    ops['data_path'] = [data_path]
-    ops['save_path0'] = data_path
-    ops['look_one_level_down'] = False
-    ops['save_folder'] = folder_name
-    ops['fast_disk'] = os.path.join(ops['save_path0'],ops['save_folder']) # stores binary here.
-    ops = {**settings,**ops}
-    # add optional suite2p settings.
-    ops = {**default_ops(),**ops}
-    return ops
+    # Create nested structure for dotted keys
+    for key in list(metadata_dict.keys()):
+        if '.' in key:
+            parts = key.split('.')
+            current = metadata_dict
+            for part in parts[:-1]:
+                current = current.setdefault(part, {})
+            current[parts[-1]] = metadata_dict.pop(key)
 
-def create_cropped_deform_field(deform, ori, crop_size):
-    """Crops out part of a Pirt DeformationField
+    # Add JSON metadata and image shape
+    metadata_dict['json'] = json.loads(metadata_json)
+    metadata_dict['image_shape'] = image.shape()
+
+    return metadata_dict
+
+
+def metadata_to_ops(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert ScanImage metadata to Suite2p operations dictionary.
 
     Args:
-        deform ([pirt.DeformationObject]): Deformation field.
-        ori (np array): origin of crop region (min x, mix y) size:2x1
-        crop_size (list): full size of cropped field.
+        metadata (Dict[str, Any]): Dictionary from tif_metadata().
 
     Returns:
-        DeformationObject: Crop deformation field.
-        np.array: origin of deformation field.
+        Dict[str, Any]: Dictionary of Suite2p parameters derived from metadata.
     """
+    ops_data: Dict[str, Any] = {
+        'fs': float(metadata['hRoiManager']['scanVolumeRate']),
+        'nplanes': 1 if isinstance(metadata['hFastZ']['userZs'], str) 
+                  else len(metadata['hFastZ']['userZs']),
+        'nrois': len(metadata['json']['RoiGroups']['imagingRoiGroup']['rois']),
+        'nchannels': int(metadata['hChannels']['channelsActive'])
+    }
+
+    roi_metadata = metadata['json']['RoiGroups']['imagingRoiGroup']['rois']
+    roi_info = {
+        'w_px': [],
+        'h_px': [],
+        'cXY': [],
+        'szXY': []
+    }
+
+    for roi in roi_metadata:
+        scanfields = roi['scanfields']
+        roi_info['w_px'].append(scanfields['pixelResolutionXY'][0])
+        roi_info['h_px'].append(scanfields['pixelResolutionXY'][1])
+        roi_info['cXY'].append(scanfields['centerXY'])
+        roi_info['szXY'].append(scanfields['sizeXY'])
+
+    # Calculate spatial parameters
+    szXY = np.array(roi_info['szXY'])
+    cXY = np.array(roi_info['cXY']) - szXY/2
+    cXY -= np.amin(cXY, axis=0)
+    mu = np.median(np.column_stack((roi_info['w_px'], roi_info['h_px'])) / szXY, axis=0)
+    imin = np.ceil(cXY * mu)
+
+    # Line calculation
+    h_px = np.array(roi_info['h_px'])
+    n_rows_sum = h_px.sum()
+    n_flyback = (metadata['image_shape'][1] - n_rows_sum) / max(1, ops_data['nrois']-1)
+    irow = np.insert(np.cumsum(h_px + n_flyback), 0, 0)[:-1]
+
+    # Final ops parameters
+    ops_data.update({
+        'dx': imin[:,0].astype(np.int32),
+        'dy': imin[:,1].astype(np.int32),
+        'lines': [np.arange(start, start+h, dtype=np.int32) 
+                for start, h in zip(irow, h_px)]
+    })
+
+    return ops_data
+
+def yaml_to_dict(file_path: str) -> Dict[str, Any]:
+    """Load YAML configuration file into dictionary.
+    
+    Args:
+        file_path (str): Path to YAML file.
+
+    Returns:
+        Dict[str, Any]: Parsed YAML content as dictionary.
+    """
+    with open(file_path) as f:
+        return yaml.load(f, Loader=yaml.FullLoader)
+
+def multiday_ops(
+    exp: Dict[str, Any],
+    session: Dict[str, Any],
+    folder_name: str,
+    settings: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Generate Suite2p ops dictionary for multi-day experiments.
+    
+    Args:
+        exp (Dict[str, Any]): Experiment configuration dictionary.
+        session (Dict[str, Any]): Session metadata dictionary.
+        folder_name (str): Output directory name.
+        settings (Dict[str, Any]): Custom Suite2p settings.
+
+    Returns:
+        Dict[str, Any]: Complete Suite2p operations dictionary.
+    """
+    data_path = os.path.join(exp['data']['folder_linux'], session['date'], str(session['sub_dir']))
+    tif_files = glob.glob(os.path.join(data_path, f"*{session['date']}_{session['sub_dir']}_*.tif"))
+
+    if not tif_files:
+        raise FileNotFoundError(f"No TIFF files found in {data_path}")
+
+    ops = metadata_to_ops(tif_metadata(tif_files[0]))
+    ops.update({
+        'data_path': [data_path],
+        'save_path0': data_path,
+        'look_one_level_down': False,
+        'save_folder': folder_name,
+        'fast_disk': os.path.join(data_path, folder_name)
+    })
+
+    return {**default_ops(), **settings, **ops}
+
+def create_cropped_deform_field(
+    deform: pirt.DeformationFieldBackward,
+    origin: np.ndarray,
+    crop_size: List[int]
+) -> Tuple[pirt.DeformationFieldBackward, np.ndarray]:
+    """Create cropped deformation field from larger deformation field.
+    
+    Args:
+        deform (pirt.DeformationFieldBackward): Original deformation field.
+        origin (np.ndarray): [y, x] coordinates of crop origin.
+        crop_size (List[int]): [height, width] of crop region.
+
+    Returns:
+        Tuple[pirt.DeformationFieldBackward, np.ndarray]: 
+            Cropped deformation field and adjusted origin coordinates.
+    """
+    origin = np.clip(origin, 0, None)
     crop_size = np.array(crop_size)
     im_size = deform[0].shape
-    # make sure origin isnt negative.
-    ori[ori<0]=0
-    # make sure crop doenst extend over size of deformation field.
-    for dim in range(2):
-        if ori[dim]+crop_size[dim]>im_size[dim]:
-            ori[dim]=im_size[dim]-crop_size[dim] 
-    # create deformation field from crop.
-    crop_deform = pirt.DeformationFieldBackward([deform[0][ori[0]:ori[0]+crop_size[0] ,ori[1]:ori[1]+crop_size[1]],
-                deform[1][ori[0]:ori[0]+crop_size[0] ,ori[1]:ori[1]+crop_size[1]]])
-    return crop_deform,ori
 
-def deform_masks(masks,deform,crop_bin = 500):
-    """Deforms cell masks according to Pirt DeformationField
+    # Adjust origin if crop exceeds image bounds
+    for dim in (0, 1):
+        if origin[dim] + crop_size[dim] > im_size[dim]:
+            origin[dim] = im_size[dim] - crop_size[dim]
 
+    # Create cropped field
+    y_slice = slice(origin[0], origin[0]+crop_size[0])
+    x_slice = slice(origin[1], origin[1]+crop_size[1])
+    return pirt.DeformationFieldBackward([
+        deform[0][y_slice, x_slice],
+        deform[1][y_slice, x_slice]
+    ]), origin
+
+def deform_masks(
+    masks: List[Dict[str, np.ndarray]],
+    deform: pirt.DeformationFieldBackward,
+    crop_bin: int = 500
+) -> List[Dict[str, np.ndarray]]:
+    """Apply deformation field to cell masks with local processing.
+    
     Args:
-        masks (list): list of dictionaries must contain keys 'xpix','ypix', and 'lam'
-        deform (DeformationField): Deformation to apply.
+        masks (List[Dict[str, np.ndarray]]): List of mask dictionaries.
+        deform (pirt.DeformationFieldBackward): Deformation field to apply.
+        crop_bin (int, optional): Processing window size for memory efficiency.
 
     Returns:
-        [list of ditionaries]: Deformed masks containing keys 'xpix','ypix','lam','ipix','radius', and 'med'
+        List[Dict[str, np.ndarray]]: List of deformed masks with updated coordinates.
     """
-    deformed_masks = []
+    deformed = []
     for mask in masks:
-        # create cropped deformation field.
-        crop_size = [crop_bin,crop_bin]
-        crop_deform, ori = create_cropped_deform_field(deform,np.array(mask["med"],int) - int(crop_bin/2),crop_size)
-        # transform lambda weight values.
-        im = np.zeros(crop_size,float)
-        im[mask["ypix"]-ori[0], mask["xpix"]-ori[1]]=mask["lam"]
-        imAr = pirt.Aarray(im,origin=tuple(ori))
-        imAr = np.array(crop_deform.apply_deformation(imAr,interpolation=0))
-        # find non zero pixels.
-        pixs = np.argwhere(imAr!=0)
-        lam_r = imAr[pixs[:,0],pixs[:,1]] # lambda values.
-        pixs+=ori
-        pixs=pixs.astype(int)
-        ipix_r = np.ravel_multi_index(np.transpose(pixs),deform[0].shape).astype(int)
-        # get median.
-        med_r = [np.median(pixs[:,0]),np.median(pixs[:,1])]
-        # get radius.
-        props = regionprops((imAr>0).astype(np.uint8))
-        radius_r = min([prop.minor_axis_length for prop in props])    
-        # store values.
-        info = {'xpix':pixs[:,1],'ypix': pixs[:,0],'ipix':ipix_r, 
-                'med':med_r,'lam': lam_r,'radius': radius_r}
-        deformed_masks.append(info)
-    # add overlap info.
-    deformed_masks = add_overlap_info(deformed_masks)
-    return deformed_masks
+        # Local processing window
+        crop_origin = np.array(mask["med"], int) - crop_bin//2
+        crop_def, adj_origin = create_cropped_deform_field(deform, crop_origin, [crop_bin]*2)
 
-def add_overlap_info(masks):
-    """ Adds 'overlap' field to list of cell masks. 
-    This marks indices in 'xpix' 'ypix' and 'ipix' that overlap with other masks.
+        # Process lambda weights
+        y_local = mask["ypix"] - adj_origin[0]
+        x_local = mask["xpix"] - adj_origin[1]
+        lam_img = np.zeros((crop_bin, crop_bin), dtype=float)
+        lam_img[y_local, x_local] = mask["lam"]
 
+        # Apply deformation
+        warped_lam = np.array(crop_def.apply_deformation(
+            pirt.Aarray(lam_img, origin=tuple(adj_origin)),
+            interpolation=0
+        ))
+
+        # Extract deformed coordinates
+        y_new, x_new = np.nonzero(warped_lam)
+        lam_values = warped_lam[y_new, x_new]
+        y_global = y_new + adj_origin[0]
+        x_global = x_new + adj_origin[1]
+
+        deformed.append({
+            'xpix': x_global,
+            'ypix': y_global,
+            'ipix': np.ravel_multi_index((y_global, x_global), deform[0].shape),
+            'med': [np.median(y_global), np.median(x_global)],
+            'lam': lam_values,
+            'radius': regionprops(warped_lam.astype(np.uint8))[0].minor_axis_length
+        })
+
+    return add_overlap_info(deformed)
+
+def add_overlap_info(masks: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+    """Identify overlapping pixels across masks.
+    
     Args:
-        masks (list): list of dictionaries. Must have field 'ipix'
+        masks (List[Dict[str, np.ndarray]]): List of mask dictionaries with 'ipix' keys.
 
     Returns:
-        [list]: list of dicitonaries with added 'overlap' key.
+        List[Dict[str, np.ndarray]]: Masks with added 'overlap' boolean arrays.
     """
-    # add overlap info.
-    ipixs = np.concatenate([ mask["ipix"] for mask in masks]).astype(int) # list of pixels in all masks
-    unique_pixels, count = np.unique(ipixs, return_counts=True)
+    all_ipix = np.concatenate([m["ipix"] for m in masks])
+    unique, counts = np.unique(all_ipix, return_counts=True)
+
     for mask in masks:
-        # look for overlap.
-        inds = np.searchsorted(unique_pixels,mask["ipix"])
-        mask['overlap'] = count[inds]>1
+        mask['overlap'] = np.isin(mask['ipix'], unique[counts > 1])
+
     return masks
