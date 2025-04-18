@@ -1,6 +1,6 @@
 from getpass import getpass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from ipyfilechooser import FileChooser
@@ -23,7 +23,7 @@ def select_settings_file(start_dir: str = '../') -> FileChooser:
     return fc
 
 
-def parse_settings(file: str, request_pass: bool = False) -> Dict[str, Any]:
+def parse_settings(file: str, request_pass: bool = False) -> dict[str, Any]:
     """Parse a YAML settings file and validate required keys. Optionally request a server password.
 
     Args:
@@ -31,7 +31,7 @@ def parse_settings(file: str, request_pass: bool = False) -> Dict[str, Any]:
         request_pass (bool, optional): If True, prompt user for server password. Defaults to False.
 
     Returns:
-        Dict[str, Any]: Parsed settings dictionary with required keys.
+        dict[str, Any]: Parsed settings dictionary with required keys.
 
     Raises:
         NameError: If any required key is missing in the settings file.
@@ -39,26 +39,27 @@ def parse_settings(file: str, request_pass: bool = False) -> Dict[str, Any]:
     file_path = Path(file)
     if file_path.is_file():
         with open(file_path) as data_file:
-            settings: Dict[str, Any] = yaml.load(data_file, Loader=yaml.FullLoader)
+            settings: dict[str, Any] = yaml.load(data_file, Loader=yaml.FullLoader)
+
         required_keys = ['server', 'cell_detection', 'registration', 'clustering', 'demix']
         for key in required_keys:
             if key not in settings:
                 raise NameError(f"Could not find key '{key}' in settings file")
         if request_pass:
-            settings['server']['password'] = getpass('Enter your server password')
+            settings['server']['password'] = getpass('Enter your server password: ')
         return settings
     else:
         raise FileNotFoundError(f"Settings file not found: {file}")
 
 
-def parse_data_info(file: str) -> Dict[str, Any]:
+def parse_data_info(file: str) -> dict[str, Any]:
     """Parse a YAML data info file and validate required keys. Ensures server paths are set.
 
     Args:
         file (str): Path to the YAML data info file.
 
     Returns:
-        Dict[str, Any]: Parsed data info dictionary with required keys and server paths set.
+        dict[str, Any]: Parsed data info dictionary with required keys and server paths set.
 
     Raises:
         NameError: If any required key is missing in the data info file.
@@ -67,7 +68,8 @@ def parse_data_info(file: str) -> Dict[str, Any]:
     file_path = Path(file)
     if file_path.is_file():
         with open(file_path) as data_file:
-            settings: Dict[str, Any] = yaml.load(data_file, Loader=yaml.FullLoader)
+            settings: dict[str, Any] = yaml.load(data_file, Loader=yaml.FullLoader)
+
         required_keys = ['data', 'animal']
         for key in required_keys:
             if key not in settings:

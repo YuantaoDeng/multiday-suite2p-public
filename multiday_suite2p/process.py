@@ -1,28 +1,30 @@
+from typing import Any
+
 import numpy as np
-from typing import Any, Dict, List, Tuple
 
 from suite2p.extraction import preprocess
+
 
 def demix_traces(
     F: np.ndarray,
     Fneu: np.ndarray,
-    cell_masks: List[Dict[str, Any]],
-    ops: Dict[str, Any]
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    cell_masks: list[dict[str, Any]],
+    ops: dict[str, Any]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Demix activity from overlapping cells using mask covariance & regularized linear regression.
 
     Args:
         F (np.ndarray): Raw fluorescence activity (shape: num_cells x num_frames).
         Fneu (np.ndarray): Raw neuropil activity (shape: num_cells x num_frames).
-        cell_masks (List[Dict[str, Any]]):
-            List of cell mask dictionaries (length: num_cells). Each dict must contain keys 'xpix',
+        cell_masks (list[dict[str, Any]]):
+            list of cell mask dictionaries (length: num_cells). Each dict must contain keys 'xpix',
             'ypix', 'lam', and 'overlap'.
-        ops (Dict[str, Any]):
+        ops (dict[str, Any]):
             Parameters for demixing. Must contain keys 'baseline', 'win_baseline', 'sig_baseline',
             'fs', 'neucoeff', 'l2_reg', 'Ly', and 'Lx'.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
             - Fdemixed (np.ndarray): Demixed fluorescence traces (num_cells x num_frames).
             - Fbase (np.ndarray): Baseline-subtracted fluorescence traces (num_cells x num_frames).
             - covU (np.ndarray): Covariance matrix of cell masks (num_cells x num_cells).

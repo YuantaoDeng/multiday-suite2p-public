@@ -2,7 +2,7 @@ import os
 import re
 import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -12,22 +12,22 @@ from .utils import create_mask_img, add_overlap_info
 
 def find_session_folders(
     main_folder: str,
-    days: List[str],
+    days: list[str],
     verbose: bool = False,
     suite2p_folder_name: str = "suite2p",
-) -> List[str]:
+) -> list[str]:
     """Find session folders containing suite2p subdirectories within the main folder.
 
     Args:
         main_folder (str): Directory that contains all the session folders.
-        days (List[str]): List of session dates to include (YYYY_MM_DD format).
+        days (list[str]): list of session dates to include (YYYY_MM_DD format).
         verbose (bool, optional): If True, print the number of found session folders. Defaults to False.
         suite2p_folder_name (str, optional): Name of the suite2p folder. Defaults to "suite2p".
 
     Returns:
-        List[str]: List of found session folder paths.
+        list[str]: list of found session folder paths.
     """
-    sessionfolders: List[str] = []
+    sessionfolders: list[str] = []
     for day in days:
         folder = os.path.join(main_folder, day)
         sessions = [
@@ -44,28 +44,28 @@ def find_session_folders(
 
 
 def import_sessions(
-    data_info: Dict[str, Any], settings: Dict[str, Any], verbose: bool = False
-) -> Tuple[
-    List[Dict[str, str]],
-    List[Dict[str, np.ndarray]],
-    List[List[Dict[str, Any]]],
-    Tuple[int, int],
-    List[np.ndarray],
+    data_info: dict[str, Any], settings: dict[str, Any], verbose: bool = False
+) -> tuple[
+    list[dict[str, str]],
+    list[dict[str, np.ndarray]],
+    list[list[dict[str, Any]]],
+    tuple[int, int],
+    list[np.ndarray],
 ]:
     """Import session data required for multiday registration.
 
     Args:
-        data_info (Dict[str, Any]): Data info dictionary with session folder locations and selection criteria.
-        settings (Dict[str, Any]): Settings dictionary for cell detection and processing.
+        data_info (dict[str, Any]): Data info dictionary with session folder locations and selection criteria.
+        settings (dict[str, Any]): Settings dictionary for cell detection and processing.
         verbose (bool, optional): If True, print progress information. Defaults to False.
 
     Returns:
-        Tuple[List[Dict[str, str]], List[Dict[str, np.ndarray]], List[List[Dict[str, Any]]], Tuple[int, int], List[np.ndarray]]:
-            - sessions: List of session info dictionaries (with 'date' and 'session_id').
-            - images: List of overview images per session (dicts with 'mean_img', 'enhanced_img', 'max_img').
-            - cells: List of detected cell mask dictionaries per session.
+        tuple[list[dict[str, str]], list[dict[str, np.ndarray]], list[list[dict[str, Any]]], tuple[int, int], list[np.ndarray]]:
+            - sessions: list of session info dictionaries (with 'date' and 'session_id').
+            - images: list of overview images per session (dicts with 'mean_img', 'enhanced_img', 'max_img').
+            - cells: list of detected cell mask dictionaries per session.
             - im_size: Image size as (height, width).
-            - cell_masks: List of cell mask label images per session.
+            - cell_masks: list of cell mask label images per session.
 
     Raises:
         NameError: If no data folders are found or if requested sessions are missing.
@@ -92,10 +92,10 @@ def import_sessions(
             raise NameError(
                 f"Could not find requested individual session {filter_path} in session selection"
             )
-    cells: List[List[Dict[str, Any]]] = []
-    cell_masks: List[np.ndarray] = []
-    images: List[Dict[str, np.ndarray]] = []
-    sessions: List[Dict[str, str]] = []
+    cells: list[list[dict[str, Any]]] = []
+    cell_masks: list[np.ndarray] = []
+    images: list[dict[str, np.ndarray]] = []
+    sessions: list[dict[str, str]] = []
     for data_path in data_paths:
         if (Path(data_path.parts[-2]) / data_path.parts[-1]).as_posix() in data_info[
             "data"
@@ -163,24 +163,24 @@ def import_sessions(
 
 
 def export_masks_and_images(
-    deformed_cell_masks: List[List[Dict[str, Any]]],
-    cell_templates: List[Dict[str, Any]],
-    trans_images: List[Dict[str, np.ndarray]],
-    images: List[Dict[str, np.ndarray]],
-    sessions: List[Dict[str, str]],
-    data_info: Dict[str, Any],
-    settings: Dict[str, Any],
+    deformed_cell_masks: list[list[dict[str, Any]]],
+    cell_templates: list[dict[str, Any]],
+    trans_images: list[dict[str, np.ndarray]],
+    images: list[dict[str, np.ndarray]],
+    sessions: list[dict[str, str]],
+    data_info: dict[str, Any],
+    settings: dict[str, Any],
 ) -> None:
     """Export masks, images, and general info to the multi-day output folder.
 
     Args:
-        deformed_cell_masks (List[List[Dict[str, Any]]]): Backwards transformed cell mask info for each session.
-        cell_templates (List[Dict[str, Any]]): Template cell mask information.
-        trans_images (List[Dict[str, np.ndarray]]): Transformed images per session.
-        images (List[Dict[str, np.ndarray]]): Original images per session.
-        sessions (List[Dict[str, str]]): Session info from import_sessions.
-        data_info (Dict[str, Any]): Data info dictionary.
-        settings (Dict[str, Any]): Settings dictionary.
+        deformed_cell_masks (list[list[dict[str, Any]]]): Backwards transformed cell mask info for each session.
+        cell_templates (list[dict[str, Any]]): Template cell mask information.
+        trans_images (list[dict[str, np.ndarray]]): Transformed images per session.
+        images (list[dict[str, np.ndarray]]): Original images per session.
+        sessions (list[dict[str, str]]): Session info from import_sessions.
+        data_info (dict[str, Any]): Data info dictionary.
+        settings (dict[str, Any]): Settings dictionary.
     """
     output_folder = (
         Path(data_info["data"]["local_processed_root"])
@@ -204,23 +204,23 @@ def export_masks_and_images(
     np.save(output_folder / "demix_settings.npy", settings["demix"])
 
 
-def import_settings_file() -> Dict[str, Any]:
+def import_settings_file() -> dict[str, Any]:
     """Import meta data file with path, animal info, and settings.
 
     Returns:
-        Dict[str, Any]: Contents of the meta data file.
+        dict[str, Any]: Contents of the meta data file.
     """
     file_loc = select_meta_file()
     with open(file_loc) as data_file:
-        meta_info: Dict[str, Any] = yaml.load(data_file, Loader=yaml.FullLoader)
+        meta_info: dict[str, Any] = yaml.load(data_file, Loader=yaml.FullLoader)
     return meta_info
 
 
-def registration_data_folder(settings: Dict[str, Any]) -> Path:
+def registration_data_folder(settings: dict[str, Any]) -> Path:
     """Get the path to the registration data folder based on settings.
 
     Args:
-        settings (Dict[str, Any]): Settings dictionary containing data paths.
+        settings (dict[str, Any]): Settings dictionary containing data paths.
 
     Returns:
         Path: Path to the registration data folder.
@@ -233,16 +233,16 @@ def registration_data_folder(settings: Dict[str, Any]) -> Path:
 
 
 def filter_data_paths(
-    data_paths: List[Path], data_selection: List[List[str]]
-) -> List[Path]:
+    data_paths: list[Path], data_selection: list[list[str]]
+) -> list[Path]:
     """Filter data paths according to selection filters (e.g. [['2020_01_01/0', '2020_01_10'], ['2020_01_02']]).
 
     Args:
-        data_paths (List[Path]): Data paths to filter through.
-        data_selection (List[List[str]]): Filter criteria.
+        data_paths (list[Path]): Data paths to filter through.
+        data_selection (list[list[str]]): Filter criteria.
 
     Returns:
-        List[Path]: Filtered list of data paths.
+        list[Path]: Filtered list of data paths.
     """
 
     def data_path_to_datetime(data_path: Path) -> pd.DatetimeIndex:
@@ -268,7 +268,7 @@ def filter_data_paths(
         )
         return dt
 
-    selected_data_paths: List[Path] = []
+    selected_data_paths: list[Path] = []
     for data_path in data_paths:
         data_path_dt = data_path_to_datetime(data_path)
         for filter_pattern in data_selection:

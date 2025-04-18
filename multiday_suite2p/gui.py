@@ -1,28 +1,30 @@
+from typing import Any, Union
+
 import ipywidgets as widgets
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Any, Dict, List, Union
 
 from IPython.display import display
 from ipywidgets import HBox, VBox
 
+
 def show_imgs_with_masks(
-    sessions: List[Dict[str, Any]],
-    images: List[Union[Dict[str, np.ndarray], np.ndarray]],
-    mask_sets: Dict[str, Union[List[np.ndarray], np.ndarray]],
+    sessions: list[dict[str, Any]],
+    images: list[Union[dict[str, np.ndarray], np.ndarray]],
+    mask_sets: dict[str, Union[list[np.ndarray], np.ndarray]],
     aspect_ratio: float = 1.5
 ) -> None:
     """
     Interactive GUI for visualizing session images and overlaying different sets of cell masks.
 
     Args:
-        sessions (List[Dict[str, Any]]):
-            List of dictionaries with session info ('date', 'session_id'). Length is number of sessions.
-        images (List[Union[Dict[str, np.ndarray], np.ndarray]]):
-            List of dictionaries (for multiple image types) or arrays (for single image type).
+        sessions (list[dict[str, Any]]):
+            list of dictionaries with session info ('date', 'session_id'). Length is number of sessions.
+        images (list[Union[dict[str, np.ndarray], np.ndarray]]):
+            list of dictionaries (for multiple image types) or arrays (for single image type).
             Each dictionary entry should have keys like 'mean_img', 'enhanced_img', 'max_img'.
-        mask_sets (Dict[str, Union[List[np.ndarray], np.ndarray]]):
-            Dictionary containing different images corresponding to cell masks (pixel value is cell mask identity).
+        mask_sets (dict[str, Union[list[np.ndarray], np.ndarray]]):
+            dictionary containing different images corresponding to cell masks (pixel value is cell mask identity).
             Each value is either a list of label images (one per session) or a 3D array (session x H x W).
         aspect_ratio (float, optional):
             Aspect ratio to show images in. Defaults to 1.5.
@@ -55,7 +57,7 @@ def show_imgs_with_masks(
     vals = np.linspace(0, 1, 10000)
     np.random.seed(4)
     np.random.shuffle(vals)
-    cmap = plt.cm.colors.ListedColormap(plt.get_cmap('hsv')(vals))
+    cmap = plt.cm.colors.listedColormap(plt.get_cmap('hsv')(vals))
 
     # Setup figure
     fig = plt.figure(figsize=(6, 6), dpi=150)

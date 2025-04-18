@@ -1,11 +1,13 @@
 import os
 from pathlib import Path
-from typing import List, Tuple, Any, Dict, Union
+from typing import Any, Union
 
 import numpy as np
+
 from suite2p.io import compute_dydx, BinaryFileCombined
 from suite2p.extraction.masks import create_masks
 from suite2p.extraction.extract import extract_traces
+
 
 def extract_traces_session(
     multiday_folder: Union[str, Path],
@@ -45,10 +47,10 @@ def extract_traces_session(
 
     print('\nCollecting data')
     # Load session info and suite2p ops for all planes
-    info: Dict[str, Any] = np.load(multiday_folder / 'info.npy', allow_pickle=True).item()
-    plane_folders: List[Path] = list((bin_folder / data_path / info['suite2p_folder']).glob('plane[0-9]'))
-    ops1: List[Dict[str, Any]] = [np.load(plane_folder / 'ops.npy', allow_pickle=True).item() for plane_folder in plane_folders]
-    reg_loc: List[Path] = [plane_folder / 'data.bin' for plane_folder in plane_folders]
+    info: dict[str, Any] = np.load(multiday_folder / 'info.npy', allow_pickle=True).item()
+    plane_folders: list[Path] = list((bin_folder / data_path / info['suite2p_folder']).glob('plane[0-9]'))
+    ops1: list[dict[str, Any]] = [np.load(plane_folder / 'ops.npy', allow_pickle=True).item() for plane_folder in plane_folders]
+    reg_loc: list[Path] = [plane_folder / 'data.bin' for plane_folder in plane_folders]
     dy, dx = compute_dydx(ops1)
     Ly = np.array([ops['Ly'] for ops in ops1])
     Lx = np.array([ops['Lx'] for ops in ops1])
@@ -65,14 +67,14 @@ def extract_traces_session(
         raise NameError(f'Could not find cell masks for {data_path.as_posix()}')
 
     # Load cell mask stats for this session
-    stats_combined: List[Dict[str, Any]] = np.load(multiday_folder / 'backwards_deformed_cell_masks.npy', allow_pickle=True)[session_ind]
+    stats_combined: list[dict[str, Any]] = np.load(multiday_folder / 'backwards_deformed_cell_masks.npy', allow_pickle=True)[session_ind]
     if 'overlap' not in stats_combined[0]:
         for stat in stats_combined:
             stat['overlap'] = True
 
     # Load combined ops and set overlap allowance
     ops_file = data_folder / data_path / info['suite2p_folder'] / 'combined' / 'ops.npy'
-    ops_combined: Dict[str, Any] = np.load(ops_file, allow_pickle=True).item()
+    ops_combined: dict[str, Any] = np.load(ops_file, allow_pickle=True).item()
     ops_combined['allow_overlap'] = True
 
     # Create cell and neuropil masks in the global (stitched) view

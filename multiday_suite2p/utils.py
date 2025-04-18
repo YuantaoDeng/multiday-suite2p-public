@@ -2,7 +2,7 @@ import glob
 import json
 import os
 
-from typing import List, Dict, Any, Tuple, Optional, Union
+from typing import Any, Optional
 
 import numpy as np
 import pirt
@@ -15,8 +15,8 @@ from suite2p.run_s2p import default_ops
 
 
 def create_mask_img(
-    masks: List[Dict[str, np.ndarray]],
-    im_size: List[int],
+    masks: list[dict[str, np.ndarray]],
+    im_size: list[int],
     field: Optional[str] = None,
     mark_overlap: bool = False,
     contours: bool = False,
@@ -25,8 +25,8 @@ def create_mask_img(
     """Create label images from cell masks with optional overlap marking and contour generation.
 
     Args:
-        masks (List[Dict[str, np.ndarray]]): List of mask dictionaries containing 'xpix' and 'ypix' keys.
-        im_size (List[int]): [height, width] of output image.
+        masks (list[dict[str, np.ndarray]]): list of mask dictionaries containing 'xpix' and 'ypix' keys.
+        im_size (list[int]): [height, width] of output image.
         field (Optional[str], optional): Mask field to use for pixel values (None for mask IDs).
         mark_overlap (bool, optional): Highlight overlapping regions with value 100.
         contours (bool, optional): Generate mask contours instead of filled regions.
@@ -75,14 +75,14 @@ def create_mask_img(
 
     return im
 
-def tif_metadata(image_path: str) -> Dict[str, Any]:
+def tif_metadata(image_path: str) -> dict[str, Any]:
     """Extract and parse metadata from ScanImage TIFF files.
 
     Args:
         image_path (str): Path to TIFF file.
 
     Returns:
-        Dict[str, Any]: Dictionary containing parsed metadata with nested structure.
+        dict[str, Any]: dictionary containing parsed metadata with nested structure.
     """
     image = ScanImageTiffReader(image_path)
     metadata_raw = image.metadata()
@@ -114,16 +114,16 @@ def tif_metadata(image_path: str) -> Dict[str, Any]:
     return metadata_dict
 
 
-def metadata_to_ops(metadata: Dict[str, Any]) -> Dict[str, Any]:
+def metadata_to_ops(metadata: dict[str, Any]) -> dict[str, Any]:
     """Convert ScanImage metadata to Suite2p operations dictionary.
 
     Args:
-        metadata (Dict[str, Any]): Dictionary from tif_metadata().
+        metadata (dict[str, Any]): dictionary from tif_metadata().
 
     Returns:
-        Dict[str, Any]: Dictionary of Suite2p parameters derived from metadata.
+        dict[str, Any]: dictionary of Suite2p parameters derived from metadata.
     """
-    ops_data: Dict[str, Any] = {
+    ops_data: dict[str, Any] = {
         'fs': float(metadata['hRoiManager']['scanVolumeRate']),
         'nplanes': 1 if isinstance(metadata['hFastZ']['userZs'], str) 
                   else len(metadata['hFastZ']['userZs']),
@@ -169,34 +169,34 @@ def metadata_to_ops(metadata: Dict[str, Any]) -> Dict[str, Any]:
 
     return ops_data
 
-def yaml_to_dict(file_path: str) -> Dict[str, Any]:
+def yaml_to_dict(file_path: str) -> dict[str, Any]:
     """Load YAML configuration file into dictionary.
     
     Args:
         file_path (str): Path to YAML file.
 
     Returns:
-        Dict[str, Any]: Parsed YAML content as dictionary.
+        dict[str, Any]: Parsed YAML content as dictionary.
     """
     with open(file_path) as f:
         return yaml.load(f, Loader=yaml.FullLoader)
 
 def multiday_ops(
-    exp: Dict[str, Any],
-    session: Dict[str, Any],
+    exp: dict[str, Any],
+    session: dict[str, Any],
     folder_name: str,
-    settings: Dict[str, Any]
-) -> Dict[str, Any]:
+    settings: dict[str, Any]
+) -> dict[str, Any]:
     """Generate Suite2p ops dictionary for multi-day experiments.
     
     Args:
-        exp (Dict[str, Any]): Experiment configuration dictionary.
-        session (Dict[str, Any]): Session metadata dictionary.
+        exp (dict[str, Any]): Experiment configuration dictionary.
+        session (dict[str, Any]): Session metadata dictionary.
         folder_name (str): Output directory name.
-        settings (Dict[str, Any]): Custom Suite2p settings.
+        settings (dict[str, Any]): Custom Suite2p settings.
 
     Returns:
-        Dict[str, Any]: Complete Suite2p operations dictionary.
+        dict[str, Any]: Complete Suite2p operations dictionary.
     """
     data_path = os.path.join(exp['data']['folder_linux'], session['date'], str(session['sub_dir']))
     tif_files = glob.glob(os.path.join(data_path, f"*{session['date']}_{session['sub_dir']}_*.tif"))
@@ -218,17 +218,17 @@ def multiday_ops(
 def create_cropped_deform_field(
     deform: pirt.DeformationFieldBackward,
     origin: np.ndarray,
-    crop_size: List[int]
-) -> Tuple[pirt.DeformationFieldBackward, np.ndarray]:
+    crop_size: list[int]
+) -> tuple[pirt.DeformationFieldBackward, np.ndarray]:
     """Create cropped deformation field from larger deformation field.
     
     Args:
         deform (pirt.DeformationFieldBackward): Original deformation field.
         origin (np.ndarray): [y, x] coordinates of crop origin.
-        crop_size (List[int]): [height, width] of crop region.
+        crop_size (list[int]): [height, width] of crop region.
 
     Returns:
-        Tuple[pirt.DeformationFieldBackward, np.ndarray]: 
+        tuple[pirt.DeformationFieldBackward, np.ndarray]: 
             Cropped deformation field and adjusted origin coordinates.
     """
     origin = np.clip(origin, 0, None)
@@ -249,19 +249,19 @@ def create_cropped_deform_field(
     ]), origin
 
 def deform_masks(
-    masks: List[Dict[str, np.ndarray]],
+    masks: list[dict[str, np.ndarray]],
     deform: pirt.DeformationFieldBackward,
     crop_bin: int = 500
-) -> List[Dict[str, np.ndarray]]:
+) -> list[dict[str, np.ndarray]]:
     """Apply deformation field to cell masks with local processing.
     
     Args:
-        masks (List[Dict[str, np.ndarray]]): List of mask dictionaries.
+        masks (list[dict[str, np.ndarray]]): list of mask dictionaries.
         deform (pirt.DeformationFieldBackward): Deformation field to apply.
         crop_bin (int, optional): Processing window size for memory efficiency.
 
     Returns:
-        List[Dict[str, np.ndarray]]: List of deformed masks with updated coordinates.
+        list[dict[str, np.ndarray]]: list of deformed masks with updated coordinates.
     """
     deformed = []
     for mask in masks:
@@ -298,14 +298,14 @@ def deform_masks(
 
     return add_overlap_info(deformed)
 
-def add_overlap_info(masks: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+def add_overlap_info(masks: list[dict[str, np.ndarray]]) -> list[dict[str, np.ndarray]]:
     """Identify overlapping pixels across masks.
     
     Args:
-        masks (List[Dict[str, np.ndarray]]): List of mask dictionaries with 'ipix' keys.
+        masks (list[dict[str, np.ndarray]]): list of mask dictionaries with 'ipix' keys.
 
     Returns:
-        List[Dict[str, np.ndarray]]: Masks with added 'overlap' boolean arrays.
+        list[dict[str, np.ndarray]]: Masks with added 'overlap' boolean arrays.
     """
     all_ipix = np.concatenate([m["ipix"] for m in masks])
     unique, counts = np.unique(all_ipix, return_counts=True)

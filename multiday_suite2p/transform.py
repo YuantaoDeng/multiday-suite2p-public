@@ -4,7 +4,7 @@ demons registration and clustering based on Jaccard distance to identify
 putative cells across sessions, and supports forward and backward transformations of masks.
 """
 
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pirt
@@ -40,20 +40,20 @@ def transform_points(
 
 
 def register_sessions(
-    images: List[Dict[str, np.ndarray]],
-    settings: Dict[str, Any]
-) -> Tuple[List[Any], List[Dict[str, np.ndarray]]]:
+    images: list[dict[str, np.ndarray]],
+    settings: dict[str, Any]
+) -> tuple[list[Any], list[dict[str, np.ndarray]]]:
     """
     Registers session images using DiffeomorphicDemonsRegistration and returns deformation objects.
 
     Args:
-        images (List[Dict[str, np.ndarray]]): List of session image dictionaries.
-        settings (Dict[str, Any]): Registration settings.
+        images (list[dict[str, np.ndarray]]): list of session image dictionaries.
+        settings (dict[str, Any]): Registration settings.
 
     Returns:
-        Tuple[List[Any], List[Dict[str, np.ndarray]]]:
-            - List of DeformationField objects (one per session).
-            - List of transformed images per session.
+        tuple[list[Any], list[dict[str, np.ndarray]]]:
+            - list of DeformationField objects (one per session).
+            - list of transformed images per session.
     """
     ims = [im[settings['img_type']] for im in images]
     reg = pirt.DiffeomorphicDemonsRegistration(*ims)
@@ -61,36 +61,36 @@ def register_sessions(
     reg.params.scale_sampling = settings['scale_sampling']
     reg.params.speed_factor = settings['speed_factor']
     reg.register(verbose=0)
-    deforms: List[Any] = []
-    trans_images: List[Dict[str, np.ndarray]] = []
+    deforms: list[Any] = []
+    trans_images: list[dict[str, np.ndarray]] = []
     for isession in range(len(images)):
         deform = reg.get_deform(isession)
         deforms.append(deform)
-        transformed: Dict[str, np.ndarray] = {}
+        transformed: dict[str, np.ndarray] = {}
         for field in ["mean_img", "enhanced_img", "max_img"]:
             transformed[field] = deform.apply_deformation(images[isession][field])
         trans_images.append(transformed)
     return deforms, trans_images
 
 def transform_cell_masks(
-    deforms: List[Any],
-    masks: List[List[Dict[str, Any]]]
-) -> Tuple[List[List[Dict[str, Any]]], List[np.ndarray]]:
+    deforms: list[Any],
+    masks: list[list[dict[str, Any]]]
+) -> tuple[list[list[dict[str, Any]]], list[np.ndarray]]:
     """
     Transforms cell masks using deformation fields from register_sessions.
 
     Args:
-        deforms (List[Any]): List of DeformationField objects (one per session).
-        masks (List[List[Dict[str, Any]]]): List of detected cell mask dictionaries per session.
+        deforms (list[Any]): list of DeformationField objects (one per session).
+        masks (list[list[dict[str, Any]]]): list of detected cell mask dictionaries per session.
 
     Returns:
-        Tuple[List[List[Dict[str, Any]]], List[np.ndarray]]:
+        tuple[list[list[dict[str, Any]]], list[np.ndarray]]:
             - Transformed cell mask dictionaries per session.
             - Transformed labeled mask images per session.
     """
     im_size = deforms[0].field_shape
-    trans_masks: List[List[Dict[str, Any]]] = []
-    trans_label: List[np.ndarray] = []
+    trans_masks: list[list[dict[str, Any]]] = []
+    trans_label: list[np.ndarray] = []
     for isession, deform in tqdm(enumerate(deforms), total=len(deforms)):
         session_masks = deform_masks(masks[isession], deform)
         # Add session number and set id to 0 (unassigned/not clustered)
@@ -120,18 +120,18 @@ def square_to_condensed(i: int, j: int, n: int) -> int:
     return int(n * j - j * (j + 1) / 2 + i - 1 - j)
 
 def cluster_cell_masks(
-    masks: List[List[Dict[str, Any]]],
-    im_size: Tuple[int, int],
-    settings: Dict[str, Any],
+    masks: list[list[dict[str, Any]]],
+    im_size: tuple[int, int],
+    settings: dict[str, Any],
     verbose: bool = True
-) -> Tuple[List[List[Dict[str, Any]]], np.ndarray]:
+) -> tuple[list[list[dict[str, Any]]], np.ndarray]:
     """
     Clusters cell masks across sessions using Jaccard distance matrix.
 
     Args:
-        masks (List[List[Dict[str, Any]]]): All cell mask information per session.
-        im_size (Tuple[int, int]): Image size (height, width).
-        settings (Dict[str, Any]):
+        masks (list[list[dict[str, Any]]]): All cell mask information per session.
+        im_size (tuple[int, int]): Image size (height, width).
+        settings (dict[str, Any]):
             Clustering settings. Keys include,
             - min_distance: Minimum distance between cell masks to be considered for clustering.
             - criterion: Criterion used for clustering (default: "distance").
@@ -143,11 +143,11 @@ def cluster_cell_masks(
         verbose (bool, optional): If True, show progress. Defaults to True.
 
     Returns:
-        Tuple[List[List[Dict[str, Any]]], np.ndarray]:
-            - List of putative cell masks (each is a list of clustered cell masks).
+        tuple[list[list[dict[str, Any]]], np.ndarray]:
+            - list of putative cell masks (each is a list of clustered cell masks).
             - Image of cell masks (label image).
     """
-    putative_cells: List[List[Dict[str, Any]]] = []
+    putative_cells: list[list[dict[str, Any]]] = []
     counter = 0
     for ypos in tqdm(range(0, im_size[0], settings['step_sizes'][1]), disable=not verbose):
         for xpos in range(0, im_size[1], settings['step_sizes'][0]):
@@ -215,24 +215,24 @@ def cluster_cell_masks(
     return putative_cells, label_im
 
 def create_template_masks(
-    putative_cells: List[List[Dict[str, Any]]],
-    im_size: Tuple[int, int],
-    settings: Dict[str, Any]
-) -> Tuple[List[Dict[str, Any]], np.ndarray]:
+    putative_cells: list[list[dict[str, Any]]],
+    im_size: tuple[int, int],
+    settings: dict[str, Any]
+) -> tuple[list[dict[str, Any]], np.ndarray]:
     """
     Create averaged template mask for each group of clustered cell masks (putative cells).
 
     Args:
-        putative_cells (List[List[Dict[str, Any]]]): List of putative cell masks.
-        im_size (Tuple[int, int]): Image plane size (height, width).
-        settings (Dict[str, Any]): Template mask settings.
+        putative_cells (list[list[dict[str, Any]]]): list of putative cell masks.
+        im_size (tuple[int, int]): Image plane size (height, width).
+        settings (dict[str, Any]): Template mask settings.
 
     Returns:
-        Tuple[List[Dict[str, Any]], np.ndarray]:
-            - List of template mask information.
+        tuple[list[dict[str, Any]], np.ndarray]:
+            - list of template mask information.
             - Image of template cell masks.
     """
-    template_masks: List[Dict[str, Any]] = []
+    template_masks: list[dict[str, Any]] = []
     for masks in putative_cells:
         idx = np.hstack([mask["ipix"] for mask in masks])
         lam = np.hstack([mask["lam"] for mask in masks])
@@ -265,25 +265,25 @@ def create_template_masks(
     return template_masks, template_im
 
 def backward_transform_masks(
-    templates: List[Dict[str, Any]],
-    deforms: List[Any]
-) -> Tuple[List[List[Dict[str, Any]]], List[np.ndarray], List[np.ndarray]]:
+    templates: list[dict[str, Any]],
+    deforms: list[Any]
+) -> tuple[list[list[dict[str, Any]]], list[np.ndarray], list[np.ndarray]]:
     """
     Perform backward transform of cell masks back to original sample space (unregistered).
 
     Args:
-        templates (List[Dict[str, Any]]): List of filtered template masks.
-        deforms (List[Any]): List of registration DeformationField objects (one per session).
+        templates (list[dict[str, Any]]): list of filtered template masks.
+        deforms (list[Any]): list of registration DeformationField objects (one per session).
 
     Returns:
-        Tuple[List[List[Dict[str, Any]]], List[np.ndarray], List[np.ndarray]]:
+        tuple[list[list[dict[str, Any]]], list[np.ndarray], list[np.ndarray]]:
             - Cell mask information per session.
-            - List of images of cell ids per session.
-            - List of images of lambda weights per session.
+            - list of images of cell ids per session.
+            - list of images of lambda weights per session.
     """
-    trans_masks: List[List[Dict[str, Any]]] = []
-    deform_lam_imgs: List[np.ndarray] = []
-    deform_label_imgs: List[np.ndarray] = []
+    trans_masks: list[list[dict[str, Any]]] = []
+    deform_lam_imgs: list[np.ndarray] = []
+    deform_label_imgs: list[np.ndarray] = []
     im_size = deforms[0][0].shape
     for deform in tqdm(deforms):
         session_masks = deform_masks(templates, deform.as_backward_inverse())
