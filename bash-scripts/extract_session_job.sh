@@ -11,7 +11,7 @@ conda init bash
 conda activate suite2p
 echo $CONDA_DEFAULT_ENV
 result=$(python <<EOF
-from multiday_suite2p.cluster.extract import extract_traces_session
+from multiday_suite2p.process.extract import extract_traces_session
 extract_traces_session("$MULTIDAY_FOLDER","$DATA_FOLDER","$BIN_FOLDER","$DATA_PATH")
 EOF
 )

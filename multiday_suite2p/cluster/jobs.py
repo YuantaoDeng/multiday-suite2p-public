@@ -1,4 +1,5 @@
 import re
+import shlex
 import uuid
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -6,7 +7,7 @@ from typing import Any, Optional, Union
 from IPython import get_ipython
 from suite2p.io.server import ssh_connect
 
-from .io import test_extract_result_present
+from ..io import test_extract_result_present
 
 
 def extract_job(

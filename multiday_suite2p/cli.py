@@ -4,7 +4,10 @@ import numpy as np
 from pathlib import Path
 
 # Example imports from the notebook
-from multiday_suite2p.io import import_sessions, registration_data_folder, export_masks_and_images
+from multiday_suite2p.cluster.jobs import extract_job
+from multiday_suite2p.io import import_sessions, export_masks_and_images
+from multiday_suite2p.process import extract_local
+from multiday_suite2p.settings import parse_settings, parse_data_info
 from multiday_suite2p.transform import (
     register_sessions,
     transform_cell_masks,
@@ -12,7 +15,6 @@ from multiday_suite2p.transform import (
     create_template_masks,
     backward_transform_masks
 )
-from multiday_suite2p.settings import select_settings_file, parse_settings, parse_data_info
 
 
 @click.group()
@@ -113,6 +115,44 @@ def export_results(filter_pkl, import_pkl, register_pkl, data_info, settings_fil
 
     export_masks_and_images(deform_masks, template_masks, trans_images, images, sessions, data_info_obj, settings_obj)
     click.echo("Export completed.")
+
+@cli.command()
+@click.option("--data-info", type=click.Path(exists=True), required=True, help="Path to data info file.")
+@click.option("--settings-file", type=click.Path(exists=True), required=True, help="Path to settings file.")
+@click.option("--force-recalc", is_flag=True, default=False, help="Force trace extraction even if result files exist.")
+@click.option("--use-server", is_flag=True, default=False, help="If True, submit jobs to the server using extract_job, otherwise run locally using extract_local.")
+def extract_traces(data_info: str, settings_file: str, force_recalc: bool, use_server: bool) -> None:
+    """
+    Extract fluorescence traces for all sessions, either locally or by submitting jobs to a cluster/server.
+
+    Args:
+        data_info (str): Path to a .json or .yaml file with data info (points to session directories).
+        settings_file (str): Path to a .json or .yaml file with settings.
+        force_recalc (bool): If True, recalculate even if existing trace files are found.
+        use_server (bool): If True, calls extract_job to submit trace extraction to a cluster/server;
+                           otherwise uses extract_local to run extraction in this environment.
+    """
+    data_info_obj = parse_data_info(data_info)
+    settings_obj = parse_settings(settings_file, request_pass=True)
+
+    # We assume that 'info.npy' has a 'data_paths' key listing session directories
+    info_file = Path(data_info_obj["data"]["local_processed_root"]) / data_info_obj["data"]["output_folder"] / "info.npy"
+    info_dict = np.load(info_file, allow_pickle=True).item()
+
+    if use_server:
+        # Submit to server
+        click.echo("Submitting extraction jobs to the server...")
+        for data_path in info_dict["data_paths"]:
+            outcome = extract_job(data_info_obj, settings_obj, data_path, force_recalc=force_recalc)
+            click.echo(f"extract_job -> {outcome}")
+    else:
+        # Run locally
+        click.echo("Running extraction locally...")
+        for data_path in info_dict["data_paths"]:
+            outcome = extract_local(data_info_obj, data_path, force_recalc=force_recalc)
+            click.echo(f"extract_local -> {outcome}")
+
+    click.echo("Extraction process completed.")
 
 
 if __name__ == "__main__":
