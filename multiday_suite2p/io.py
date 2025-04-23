@@ -154,11 +154,11 @@ def import_sessions(
             cell_masks.append(
                 create_mask_img(filtered_cells, im_size, mark_overlap=True)
             )
-    (
-        Path(data_info["data"]["local_processed_root"])
-        / data_info["data"]["output_folder"]
-        / "registration_data"
-    ).mkdir(parents=True, exist_ok=True)
+    if data_info["data"].get("processed_data_folder"):
+        base_dir = Path(data_info["data"]["processed_data_folder"])
+    else:
+        base_dir = Path(data_info["data"]["local_processed_root"]) / data_info["data"]["output_folder"]
+    (base_dir / "registration_data").mkdir(parents=True, exist_ok=True)
     return sessions, images, cells, im_size, cell_masks
 
 
@@ -182,10 +182,10 @@ def export_masks_and_images(
         data_info (dict[str, Any]): Data info dictionary.
         settings (dict[str, Any]): Settings dictionary.
     """
-    output_folder = (
-        Path(data_info["data"]["local_processed_root"])
-        / data_info["data"]["output_folder"]
-    )
+    if data_info["data"].get("processed_data_folder"):
+        output_folder = Path(data_info["data"]["processed_data_folder"])
+    else:
+        output_folder = Path(data_info["data"]["local_processed_root"]) / data_info["data"]["output_folder"]
     output_folder.mkdir(parents=True, exist_ok=True)
     print(f"Saving multi-day info in {output_folder}.. ")
     data_paths = [
@@ -225,11 +225,14 @@ def registration_data_folder(settings: dict[str, Any]) -> Path:
     Returns:
         Path: Path to the registration data folder.
     """
-    return (
-        Path(settings["data"]["local_processed_root"])
-        / settings["data"]["output_folder"]
-        / "registration_data"
-    )
+    if settings["data"].get("processed_data_folder"):
+        return Path(settings["data"]["processed_data_folder"]) / "registration_data"
+    else:
+        return (
+            Path(settings["data"]["local_processed_root"])
+            / settings["data"]["output_folder"]
+            / "registration_data"
+        )
 
 
 def filter_data_paths(

@@ -1,12 +1,13 @@
 # Data folder locations.
 data:
   # Contents of data root should be organized as 2020_01_01/1
-  local_bin_root: '//nrs/spruston/Monitor-Test/raw/Test-Tyche'   # Local Raw Data root folder with bin files.
+  local_bin_root: '//workdir/kg574/data/raw/Tyche-F2'   # Local Raw Data root folder with bin files.
   server_bin_root: ''  # Server Raw Data root folder with bin files. (linux). Leave empty for same as local folder (eg: '')
-  local_processed_root: '//nrs/spruston/Monitor-Test/processed/Test-Tyche'  # Processed Data folder on local machine
+  local_processed_root: '//workdir/kg574/data/processed/Tyche-F2'  # Processed Data folder on local machine
   server_processed_root:  ''  # Processed Data folder on server (linux). Leave empty for same as local folder (eg: '')
   suite2p_folder: suite2p
   output_folder: multi_day_demix # output folder for multiday data.
+  processed_data_folder: '//workdir/yd478/registration' 
   # filter for specific session (leave '[]' for all)
   # valid examples:
   # [['2020_01_01']]
@@ -15,7 +16,7 @@ data:
   # or combinations of these:
   # [['2020_01_01/0', '2020_01_10'], ['2020_01_13/1']]
   # all selections are INCLUSIVE (including edges) so ['2020_01_01','2020_01_03'] processes 3 days.
-  session_selection: [['2021_10_22','2021_10_27']] 
+  session_selection: [['2023_02_27','2027_02_28']] 
   # Include session as standalone data for vr2p processing.
   # These sessions are not included in the registration process but theyre own data (with their own unique cell masks will be included)
   # example: ['2021_12_24/2'] leave empty:[] for none
