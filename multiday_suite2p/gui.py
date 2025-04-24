@@ -3,6 +3,8 @@ from typing import Any, Union
 import ipywidgets as widgets
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
 
 from IPython.display import display
 from ipywidgets import HBox, VBox
@@ -57,7 +59,7 @@ def show_imgs_with_masks(
     vals = np.linspace(0, 1, 10000)
     np.random.seed(4)
     np.random.shuffle(vals)
-    cmap = plt.cm.colors.listedColormap(plt.get_cmap('hsv')(vals))
+    cmap = ListedColormap(plt.get_cmap('hsv')(vals))
 
     # Setup figure
     fig = plt.figure(figsize=(6, 6), dpi=150)
