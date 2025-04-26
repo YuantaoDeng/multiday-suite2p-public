@@ -160,7 +160,7 @@ def register_sessions(images, settings):
   demons.SetNumberOfIterations(int(demon_cfg['iterations']))
   demons.SetSmoothDisplacementField(bool(demon_cfg['smooth_displacement']))
   demons.SetStandardDeviations(float(demon_cfg['smoothing_sigma']))
-  # Define multi-scale (two levels: 1/4 and 1/2 resolutions)
+  # Define multi-scale
   shrink_factors   = demon_cfg['shrink_factors']
   smoothing_sigmas = demon_cfg['smoothing_sigmas']
   deforms = []
