@@ -5,7 +5,7 @@ import os
 from typing import Any, Optional
 
 import numpy as np
-import pirt
+import SimpleITK as sitk
 import scipy.ndimage
 import yaml
 
@@ -215,102 +215,86 @@ def multiday_ops(
 
     return {**default_ops(), **settings, **ops}
 
-def create_cropped_deform_field(
-    deform: pirt.DeformationFieldBackward,
-    origin: np.ndarray,
-    crop_size: list[int]
-) -> tuple[pirt.DeformationFieldBackward, np.ndarray]:
-    """Create cropped deformation field from larger deformation field.
-    
-    Args:
-        deform (pirt.DeformationFieldBackward): Original deformation field.
-        origin (np.ndarray): [y, x] coordinates of crop origin.
-        crop_size (list[int]): [height, width] of crop region.
 
-    Returns:
-        tuple[pirt.DeformationFieldBackward, np.ndarray]: 
-            Cropped deformation field and adjusted origin coordinates.
-    """
-    origin = np.clip(origin, 0, None)
-    crop_size = np.array(crop_size)
-    im_size = deform[0].shape
+def deform_masks(masks, deform, crop_bin=500):
+  """Deforms cell masks according to a given deformation (SimpleITK transform).
+  Args:
+    masks (list of dict): List of mask dicts with 'xpix','ypix','lam'.
+    deform (DemonsTransform or sitk.Transform): Transform mapping reference frame -> moving frame (backward field).
+    crop_bin (int): Size of the cropping window for warping (pixels).
+  Returns:
+    list of dict: Deformed masks (with 'xpix','ypix','lam','ipix','med','radius').
+  """
+  deformed_masks = []
+  # Determine image full size from transform
+  if hasattr(deform, 'field_shape'):
+    full_shape = deform.field_shape  # (height, width)
+  else:
+    raise ValueError("Deform must have field_shape attribute or known image size.")
+  sitk_tx = deform.transform if hasattr(deform, 'transform') else deform
+  for mask in masks:
+    # Define crop region around mask center
+    cy, cx = int(mask['med'][0]), int(mask['med'][1])
+    ori_y = max(0, cy - crop_bin // 2)
+    ori_x = max(0, cx - crop_bin // 2)
+    if ori_y + crop_bin > full_shape[0]:
+      ori_y = max(0, full_shape[0] - crop_bin)
+    if ori_x + crop_bin > full_shape[1]:
+      ori_x = max(0, full_shape[1] - crop_bin)
+    crop_h = min(crop_bin, full_shape[0])
+    crop_w = min(crop_bin, full_shape[1])
+    # Create an image patch of lambda values for this mask (in moving space)
+    lam_patch = np.zeros((crop_h, crop_w), float)
+    local_y = mask['ypix'] - ori_y
+    local_x = mask['xpix'] - ori_x
+    valid = (local_y >= 0) & (local_y < crop_h) & (local_x >= 0) & (local_x < crop_w)
+    lam_patch[local_y[valid], local_x[valid]] = mask['lam'][valid]
+    # Convert to SimpleITK image and position it in moving frame
+    sitk_patch = sitk.GetImageFromArray(lam_patch)
+    sitk_patch.SetOrigin((float(ori_x), float(ori_y)))
+    sitk_patch.SetSpacing((1.0, 1.0))
+    # Define output patch in reference frame (same size and origin in reference coords)
+    out_img = sitk.Image(crop_w, crop_h, sitk.sitkFloat64)
+    out_img.SetOrigin((float(ori_x), float(ori_y)))
+    out_img.SetSpacing((1.0, 1.0))
+    # Resample from moving to reference using the backward transform
+    warped = sitk.Resample(sitk_patch, out_img, sitk_tx, sitk.sitkNearestNeighbor, 0.0)
+    warped_arr = sitk.GetArrayFromImage(warped)
+    pixs = np.argwhere(warped_arr != 0)
+    if pixs.size == 0:
+      continue  # no pixels (mask may have moved out of frame)
+    lam_vals = warped_arr[pixs[:,0], pixs[:,1]]
+    pixs_global = pixs + np.array([ori_y, ori_x])
+    pixs_global = pixs_global.astype(int)
+    ipix = np.ravel_multi_index((pixs_global[:,0], pixs_global[:,1]), (full_shape[0], full_shape[1]))
+    med_new = [float(np.median(pixs_global[:,0])), float(np.median(pixs_global[:,1]))]
+    # Compute radius via region properties on warped mask
+    mask_bin = (warped_arr > 0).astype(np.uint8)
+    props = regionprops(mask_bin)
+    radius_new = min([prop.minor_axis_length for prop in props]) if props else 0.0
+    deformed_masks.append({
+      'xpix': pixs_global[:,1],
+      'ypix': pixs_global[:,0],
+      'ipix': ipix,
+      'med': med_new,
+      'lam': lam_vals,
+      'radius': radius_new
+    })
+  deformed_masks = add_overlap_info(deformed_masks)
+  return deformed_masks
 
-    # Adjust origin if crop exceeds image bounds
-    for dim in (0, 1):
-        if origin[dim] + crop_size[dim] > im_size[dim]:
-            origin[dim] = im_size[dim] - crop_size[dim]
-
-    # Create cropped field
-    y_slice = slice(origin[0], origin[0]+crop_size[0])
-    x_slice = slice(origin[1], origin[1]+crop_size[1])
-    return pirt.DeformationFieldBackward([
-        deform[0][y_slice, x_slice],
-        deform[1][y_slice, x_slice]
-    ]), origin
-
-def deform_masks(
-    masks: list[dict[str, np.ndarray]],
-    deform: pirt.DeformationFieldBackward,
-    crop_bin: int = 500
-) -> list[dict[str, np.ndarray]]:
-    """Apply deformation field to cell masks with local processing.
-    
-    Args:
-        masks (list[dict[str, np.ndarray]]): list of mask dictionaries.
-        deform (pirt.DeformationFieldBackward): Deformation field to apply.
-        crop_bin (int, optional): Processing window size for memory efficiency.
-
-    Returns:
-        list[dict[str, np.ndarray]]: list of deformed masks with updated coordinates.
-    """
-    deformed = []
-    for mask in masks:
-        # Local processing window
-        crop_origin = np.array(mask["med"], int) - crop_bin//2
-        crop_def, adj_origin = create_cropped_deform_field(deform, crop_origin, [crop_bin]*2)
-
-        # Process lambda weights
-        y_local = mask["ypix"] - adj_origin[0]
-        x_local = mask["xpix"] - adj_origin[1]
-        lam_img = np.zeros((crop_bin, crop_bin), dtype=float)
-        lam_img[y_local, x_local] = mask["lam"]
-
-        # Apply deformation
-        warped_lam = np.array(crop_def.apply_deformation(
-            pirt.Aarray(lam_img, origin=tuple(adj_origin)),
-            interpolation=0
-        ))
-
-        # Extract deformed coordinates
-        y_new, x_new = np.nonzero(warped_lam)
-        lam_values = warped_lam[y_new, x_new]
-        y_global = y_new + adj_origin[0]
-        x_global = x_new + adj_origin[1]
-
-        deformed.append({
-            'xpix': x_global,
-            'ypix': y_global,
-            'ipix': np.ravel_multi_index((y_global, x_global), deform[0].shape),
-            'med': [np.median(y_global), np.median(x_global)],
-            'lam': lam_values,
-            'radius': regionprops(warped_lam.astype(np.uint8))[0].minor_axis_length
-        })
-
-    return add_overlap_info(deformed)
-
-def add_overlap_info(masks: list[dict[str, np.ndarray]]) -> list[dict[str, np.ndarray]]:
-    """Identify overlapping pixels across masks.
-    
-    Args:
-        masks (list[dict[str, np.ndarray]]): list of mask dictionaries with 'ipix' keys.
-
-    Returns:
-        list[dict[str, np.ndarray]]: Masks with added 'overlap' boolean arrays.
-    """
-    all_ipix = np.concatenate([m["ipix"] for m in masks])
-    unique, counts = np.unique(all_ipix, return_counts=True)
-
-    for mask in masks:
-        mask['overlap'] = np.isin(mask['ipix'], unique[counts > 1])
-
+def add_overlap_info(masks):
+  """Adds an 'overlap' boolean array to each mask dict indicating overlapping pixels.
+  Args:
+    masks (list of dict): Masks with 'ipix' field.
+  Returns:
+    list of dict: Same list with 'overlap' field added to each mask.
+  """
+  if not masks:
     return masks
+  all_ipix = np.concatenate([mask['ipix'] for mask in masks]).astype(int)
+  unique_pixels, counts = np.unique(all_ipix, return_counts=True)
+  for mask in masks:
+    inds = np.searchsorted(unique_pixels, mask['ipix'])
+    mask['overlap'] = counts[inds] > 1
+  return masks

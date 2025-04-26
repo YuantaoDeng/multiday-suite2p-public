@@ -13,10 +13,17 @@ cell_detection:
 
 # multiday registration through port settings
 registration:
-  img_type: "enhanced_img" #type of image to use for registration
-  grid_sampling_factor: 1 #The grid sampling at the final level.
-  scale_sampling: 20 #The amount of iterations for each level
-  speed_factor: 3 #The relative force of the transform 
+  img_type: "enhanced_img"        # Key to select which overview image to use for registration
+  demons:
+    iterations: 50               # Number of iterations for the FastSymmetricForcesDemons filter :contentReference[oaicite:0]{index=0}
+    smooth_displacement: true    # Enable Gaussian smoothing of the displacement field :contentReference[oaicite:1]{index=1}
+    smoothing_sigma: 1.0         # Standard deviation for Gaussian smoothing of the displacement field :contentReference[oaicite:2]{index=2}
+    shrink_factors:              # Downsampling factors for each pyramid level (coarse → fine)
+      - [4, 4]
+      - [2, 2]
+    smoothing_sigmas:            # Gaussian σ to apply at each pyramid level
+      - [4, 4]
+      - [2, 2]
 
 # cell mask clustering.
 clustering:
