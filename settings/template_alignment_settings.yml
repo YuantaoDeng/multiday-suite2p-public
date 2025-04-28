@@ -24,6 +24,7 @@ registration:
     smoothing_sigmas:            # Gaussian σ to apply at each pyramid level
       - [4, 4]
       - [2, 2]
+    max_step_length: 2.0
 
 # cell mask clustering.
 clustering:
