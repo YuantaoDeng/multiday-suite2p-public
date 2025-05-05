@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 MULTIDAY_FOLDER=$1
 DATA_FOLDER=$2
 BIN_FOLDER=$3
@@ -11,7 +11,7 @@ conda init bash
 conda activate suite2p
 echo $CONDA_DEFAULT_ENV
 result=$(python <<EOF
-from multiday_suite2p.process.extract import extract_traces_session
+from multiday_suite2p.process import extract_traces_session
 extract_traces_session("$MULTIDAY_FOLDER","$DATA_FOLDER","$BIN_FOLDER","$DATA_PATH")
 EOF
 )

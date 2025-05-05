@@ -35,9 +35,9 @@ def extract_job(
     Raises:
         NameError: If job submission fails or job id cannot be found.
     """
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / data_path
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / data_path
     if (not test_extract_result_present(result_folder)) or force_recalc:
-        multiday_linux = (Path(data_info['data']['server_processed_root']) / data_info['data']['output_folder']).as_posix()
+        multiday_linux = (Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder']).as_posix()
         data_folder = data_info['data']['server_processed_root']
         bin_folder = data_info['data']['server_bin_root']
         data_path = Path(data_path)
@@ -88,7 +88,7 @@ def check_job_status(
     stdin, stdout, stderr = ssh.exec_command(f'bjobs -l {job["job_id"]}')
     status_match = re.search(r"Status <.*>", stdout.read().decode('utf-8'))
     status = status_match.group() if status_match else 'Status <Unknown>'
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / job["data_path"]
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / job["data_path"]
     file_status = 'present' if test_extract_result_present(result_folder) else 'absent'
     print(f'{job["data_path"]}: {status}, trace files: {file_status}')
 
@@ -97,7 +97,7 @@ def extract_job_slurm(
     settings: dict[str, Any],
     data_path: Union[str, Path],
     force_recalc: bool = False,
-    sbatchargs: str = '',
+    sbatchargs: str = '--mem=16G',
     extract_job_path: str = '~/.multiday-suite2p/extract_session_job.sh'
 ) -> Optional[dict[str, Any]]:
     """
@@ -117,9 +117,9 @@ def extract_job_slurm(
     Raises:
         NameError: If job submission fails or job id cannot be found.
     """
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / data_path
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / data_path
     if (not test_extract_result_present(result_folder)) or force_recalc:
-        multiday_linux = (Path(data_info['data']['server_processed_root']) / data_info['data']['output_folder']).as_posix()
+        multiday_linux = (Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder']).as_posix()
         data_folder = data_info['data']['server_processed_root']
         bin_folder = data_info['data']['server_bin_root']
         data_path = Path(data_path)
@@ -169,7 +169,7 @@ def check_job_status_slurm(
     status_output = stdout.read().decode('utf-8')
     status_match = re.search(r"JobState=(\w+)", status_output)
     status = f"Status <{status_match.group(1)}>" if status_match else "Status <Unknown>"
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / job["data_path"]
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / job["data_path"]
     file_status = 'present' if test_extract_result_present(result_folder) else 'absent'
     print(f'{job["data_path"]}: {status}, trace files: {file_status}')
 
@@ -178,7 +178,7 @@ def extract_job_ipython(
     settings: dict[str, Any],
     data_path: Union[str, Path],
     force_recalc: bool = False,
-    sbatchargs: str = '',
+    sbatchargs: str = '--mem=16G',
     extract_job_path: str = '~/.multiday-suite2p/extract_session_job.sh'
 ) -> Optional[dict[str, Any]]:
     """
@@ -198,9 +198,9 @@ def extract_job_ipython(
     Raises:
         NameError: If job submission fails or job id cannot be found.
     """
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / data_path
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / data_path
     if (not test_extract_result_present(result_folder)) or force_recalc:
-        multiday_linux = (Path(data_info['data']['server_processed_root']) / data_info['data']['output_folder']).as_posix()
+        multiday_linux = (Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder']).as_posix()
         data_folder = data_info['data']['server_processed_root']
         bin_folder = data_info['data']['server_bin_root']
         data_path = Path(data_path)
@@ -250,6 +250,6 @@ def check_job_status_ipython(
     output_str = "\n".join(output)
     status_match = re.search(r"JobState=(\w+)", output_str)
     status = f"Status <{status_match.group(1)}>" if status_match else "Status <Unknown>"
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / job["data_path"]
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / job["data_path"]
     file_status = 'present' if test_extract_result_present(result_folder) else 'absent'
     print(f'{job["data_path"]}: {status}, trace files: {file_status}')

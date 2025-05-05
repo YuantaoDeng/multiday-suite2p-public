@@ -1,8 +1,9 @@
 # Server settings.
 server:
-  host: 'login2.int.janelia.org'
+  host: 'cbsuwsun.biohpc.cornell.edu'
   n_cores: 10
-  username: 'user'
+  username: ''
+  password: ''
 
 # Suite2p cell detection filtering.
 cell_detection:

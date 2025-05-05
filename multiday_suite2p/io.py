@@ -155,7 +155,7 @@ def import_sessions(
                 create_mask_img(filtered_cells, im_size, mark_overlap=True)
             )
     if data_info["data"].get("processed_data_folder"):
-        base_dir = Path(data_info["data"]["processed_data_folder"])
+        base_dir = Path(data_info["data"]["processed_data_folder"]) / data_info["data"]["output_folder"]
     else:
         base_dir = Path(data_info["data"]["local_processed_root"]) / data_info["data"]["output_folder"]
     (base_dir / "registration_data").mkdir(parents=True, exist_ok=True)
@@ -183,7 +183,7 @@ def export_masks_and_images(
         settings (dict[str, Any]): Settings dictionary.
     """
     if data_info["data"].get("processed_data_folder"):
-        output_folder = Path(data_info["data"]["processed_data_folder"])
+        output_folder = Path(data_info["data"]["processed_data_folder"]) / data_info["data"]["output_folder"]
     else:
         output_folder = Path(data_info["data"]["local_processed_root"]) / data_info["data"]["output_folder"]
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -226,7 +226,11 @@ def registration_data_folder(settings: dict[str, Any]) -> Path:
         Path: Path to the registration data folder.
     """
     if settings["data"].get("processed_data_folder"):
-        return Path(settings["data"]["processed_data_folder"]) / "registration_data"
+        return (
+            Path(settings["data"]["processed_data_folder"])
+            / settings["data"]["output_folder"]
+            / "registration_data"
+        )
     else:
         return (
             Path(settings["data"]["local_processed_root"])

@@ -109,7 +109,7 @@ def extract_traces_session(
     print('\nCollecting data')
     # Load session info and suite2p ops for all planes
     info: dict[str, Any] = np.load(multiday_folder / 'info.npy', allow_pickle=True).item()
-    plane_folders: list[Path] = list((bin_folder / data_path / info['suite2p_folder']).glob('plane[0-9]'))
+    plane_folders: list[Path] = list((data_folder / data_path / info['suite2p_folder']).glob('plane[0-9]'))
     ops1: list[dict[str, Any]] = [np.load(plane_folder / 'ops.npy', allow_pickle=True).item() for plane_folder in plane_folders]
     reg_loc: list[Path] = [plane_folder / 'data.bin' for plane_folder in plane_folders]
     dy, dx = compute_dydx(ops1)
@@ -175,9 +175,9 @@ def extract_local(
     Raises:
         NameError: If the extraction fails.
     """
-    result_folder = Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder'] / 'sessions' / data_path
+    result_folder = Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder'] / 'sessions' / data_path
     if (not test_extract_result_present(result_folder)) or force_recalc:
-        multiday_folder = (Path(data_info['data']['local_processed_root']) / data_info['data']['output_folder']).as_posix()
+        multiday_folder = (Path(data_info['data']['processed_data_folder']) / data_info['data']['output_folder']).as_posix()
         data_folder = data_info['data']['local_processed_root']
         bin_folder = data_info['data']['local_bin_root']
         data_path = Path(data_path).as_posix()

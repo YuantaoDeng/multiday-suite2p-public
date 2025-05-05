@@ -4,7 +4,7 @@ demons registration and clustering based on Jaccard distance to identify
 putative cells across sessions, and supports forward and backward transformations of masks.
 """
 
-from typing import Any
+from typing import Any, List, Tuple, Dict
 
 import numpy as np
 import SimpleITK as sitk
@@ -99,6 +99,8 @@ class DemonsTransform:
   def __init__(self, sitk_transform, field_shape):
     self.transform = sitk_transform           # SimpleITK transform (displacement field)
     self.field_shape = field_shape           # (rows, cols) shape of the reference image
+    self.tx          = sitk_transform 
+    self.shape       = field_shape
   def apply_deformation(self, image_array, interpolator=sitk.sitkLinear):
     """Apply this transform to warp a 2D numpy image to the reference frame."""
     # Convert numpy array to SimpleITK
@@ -111,6 +113,7 @@ class DemonsTransform:
     # Resample moving image onto reference grid
     warped = sitk.Resample(sitk_image, reference, self.transform, interpolator, 0.0)
     return sitk.GetArrayFromImage(warped)
+  
   
   
 def transform_points(xpix, ypix, deform):
@@ -366,53 +369,83 @@ def create_template_masks(
     return template_masks, template_im
 
 
-def backward_transform_masks(templates, deforms):
-  """Transform template masks from reference frame back to each original session's space.
-  Args:
-    templates (list): List of template mask dicts (consensus masks in reference frame).
-    deforms (list): List of DemonsTransform or sitk.Transform for each session (as from register_sessions).
-  Returns:
-    list: List of length num_sessions, each an embedded list of mask dicts (templates mapped to that session).
-    list: List of label images (per session) with cell IDs.
-    list: List of images (per session) with lambda weights.
-  """
-  trans_masks = []
-  label_imgs = []
-  lam_imgs = []
-  # Determine image size (reference image shape)
-  if hasattr(deforms[0], 'field_shape'):
-    im_shape = deforms[0].field_shape
-  else:
-    raise ValueError("Transforms do not contain field_shape information.")
-  for s_idx, deform in enumerate(tqdm(deforms, desc="Backward transforming masks")):
-    sitk_tx = deform.transform if hasattr(deform, 'transform') else deform
-    session_masks = []
-    for tmpl in templates:
-      # Transform each pixel of template mask to this session
-      xpix = tmpl['xpix']; ypix = tmpl['ypix']; lam = tmpl['lam']
-      coords = [sitk_tx.TransformPoint((float(x), float(y))) for x, y in zip(xpix, ypix)]
-      coords = np.array(coords)
-      # Round to nearest pixel
-      new_x = np.rint(coords[:,0]).astype(int)
-      new_y = np.rint(coords[:,1]).astype(int)
-      # Filter points outside the image bounds
-      valid = (new_x >= 0) & (new_x < im_shape[1]) & (new_y >= 0) & (new_y < im_shape[0])
-      if not np.any(valid):
-        continue
-      new_x = new_x[valid]; new_y = new_y[valid]; lam_vals = lam[valid]
-      ipix = np.ravel_multi_index((new_y, new_x), (im_shape[0], im_shape[1]))
-      med = [float(np.median(new_y)), float(np.median(new_x))]
-      info = {
-        'xpix': new_x,
-        'ypix': new_y,
-        'ipix': ipix,
-        'lam': lam_vals,
-        'med': med,
-        'id': tmpl.get('id', 0)
-      }
-      session_masks.append(info)
-    session_masks = add_overlap_info(session_masks)
-    trans_masks.append(session_masks)
-    label_imgs.append(create_mask_img(session_masks, im_shape, mark_overlap=True))
-    lam_imgs.append(create_mask_img(session_masks, im_shape, field='lam'))
-  return trans_masks, label_imgs, lam_imgs
+def backward_transform_masks(
+    templates: List[Dict[str, Any]],
+    deforms: List[Any]
+) -> Tuple[List[List[Dict[str, Any]]], List[np.ndarray], List[np.ndarray]]:
+    """
+    Transform template masks from reference frame back to each original session's space.
+
+    Args:
+        templates: List of template mask dicts (consensus masks in reference frame).
+        deforms:   List of DemonsTransform or sitk.Transform for each session (as from register_sessions).
+
+    Returns:
+        trans_masks: List of length num_sessions, each an embedded list of mask dicts mapped to that session.
+        label_imgs:  List of label images (per session) with cell IDs.
+        lam_imgs:    List of images (per session) with lambda weights.
+    """
+    trans_masks: List[List[Dict[str, Any]]] = []
+    label_imgs:   List[np.ndarray]          = []
+    lam_imgs:     List[np.ndarray]          = []
+
+    # Determine image shape from the first transform
+    if hasattr(deforms[0], 'field_shape'):
+        im_shape = deforms[0].field_shape
+    else:
+        raise ValueError("Transforms do not contain field_shape information.")
+
+    for deform in tqdm(deforms, desc="Backward transforming masks"):
+        # Extract underlying SITK transform
+        sitk_tx = deform.transform if hasattr(deform, 'transform') else deform
+
+        session_masks: List[Dict[str, Any]] = []
+        for tmpl in templates:
+            # Copy original template to preserve all metadata
+            info = tmpl.copy()
+
+            # Original mask pixel coords and weights
+            xpix = tmpl['xpix']
+            ypix = tmpl['ypix']
+            lam_vals = tmpl['lam']
+
+            # Apply inverse mapping to each (x, y)
+            coords = [
+                sitk_tx.TransformPoint((float(x), float(y)))
+                for x, y in zip(xpix, ypix)
+            ]
+            coords = np.array(coords)  # shape = (n_pixels, 2)
+
+            # Round to nearest integer pixel
+            new_x = np.rint(coords[:, 0]).astype(int)
+            new_y = np.rint(coords[:, 1]).astype(int)
+
+            # Filter pixels outside image bounds
+            valid = (
+                (new_x >= 0) & (new_x < im_shape[1]) &
+                (new_y >= 0) & (new_y < im_shape[0])
+            )
+            if not np.any(valid):
+                continue
+
+            # Update info with mapped coordinates and weights
+            info['xpix'] = new_x[valid]
+            info['ypix'] = new_y[valid]
+            info['ipix'] = np.ravel_multi_index(
+                (info['ypix'], info['xpix']), im_shape
+            )
+            info['lam'] = lam_vals[valid]
+            info['med'] = [
+                float(np.median(info['ypix'])),
+                float(np.median(info['xpix']))
+            ]
+
+            session_masks.append(info)
+
+        # Add overlap flags and render images
+        session_masks = add_overlap_info(session_masks)
+        trans_masks.append(session_masks)
+        label_imgs.append(create_mask_img(session_masks, im_shape, mark_overlap=True))
+        lam_imgs.append(create_mask_img(session_masks, im_shape, field='lam'))
+
+    return trans_masks, label_imgs, lam_imgs
