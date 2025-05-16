@@ -1,9 +1,9 @@
 # Server settings.
 server:
-  host: 'cbsuwsun.biohpc.cornell.edu'
+  host: ''
   n_cores: 10
-  username: 'yd478'
-  password: 'Dyt20040821'
+  username: ''
+  password: ''
 
 # Suite2p cell detection filtering.
 cell_detection:
