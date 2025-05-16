@@ -40,7 +40,7 @@ def smooth_and_resample(image, shrink_factors, smoothing_sigmas):
   new_spacing = [((orig_sz - 1) * orig_sp) / (new_sz - 1) if new_sz > 1 else orig_sp 
                  for orig_sz, orig_sp, new_sz in zip(orig_size, orig_spacing, new_size)]
   # Resample the image to the new size
-  return sitk.Resample(smoothed, new_size, sitk.Transform(), sitk.sitkLinear,
+  return sitk.Resample(smoothed, new_size, sitk.Transform(), sitk.sitkNearestNeighbor,
                        image.GetOrigin(), new_spacing, image.GetDirection(), 0.0, image.GetPixelID())
 
 def multiscale_demons_2d(registration_algorithm, fixed_image, moving_image,
@@ -179,7 +179,7 @@ def register_sessions(images, settings):
     moving_image = sitk.GetImageFromArray(moving_array)
     moving_image.SetOrigin((0.0, 0.0)); moving_image.SetSpacing((1.0, 1.0))
     # Run multi-scale demons registration
-    disp_tx = multiscale_demons_2d(demons, fixed_image, moving_image, initial_transform=None,
+    disp_tx = multiscale_demons_2d(demons, fixed_image, moving_image,
                                    shrink_factors=shrink_factors, smoothing_sigmas=smoothing_sigmas)
     demons_tx = DemonsTransform(disp_tx, fixed_array.shape)
     deforms.append(demons_tx)
